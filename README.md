@@ -7,7 +7,7 @@ A bash script for downloading images and metadata from mangabuddy.
 ## Requirements
 
  - [reliq](https://github.com/TUVIMEN/reliq)
- - [jq](https://github.com/jqlang/jq) (only needed for `--json` option)
+ - [jq](https://github.com/jqlang/jq)
 
 ## Installation
 
