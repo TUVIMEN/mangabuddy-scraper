@@ -2,7 +2,7 @@
 
 A bash script for downloading images and metadata from mangabuddy.
 
-![example](example.mkv)
+<video src="example.mkv" autoplay="true" />
 
 ## Requirements
 
