@@ -1,0 +1,347 @@
+#!/bin/bash
+# by Dominik Stanisław Suchora <suchora.dominik7@gmail.com>
+# License: GNU GPLv3
+
+IFS=$'\n'
+shopt -s extglob
+
+declare -r DTOP="mangabuddy.com"
+declare -r DOMAIN="https://$DTOP" waittime=0.6
+declare _cookies threads=4 comments_limit=9999999 reviews_limit=9999999 noimages=0 nochapters=0
+declare -r arg0="$(basename "$0")"
+
+declare mode=1
+    #0 images
+    #1 basic
+    #2 full
+
+
+declare -r RELIQ_COMMENTS='
+    div .comment-item; {
+        .lvl.u * self | "%L",
+        div .author child@; {
+            .avatar img data-src | "%(data-src)v",
+            .type span .author-type | "%i"
+        },
+        div .comment-info child@; div .comment-summary child@; {
+            .name span .author-name child@ | "%i",
+            .date abbr .comment-date value child@ | "%(value)v",
+            .text div .summary child@ | "%i",
+            .signature div .signature child@; p child@ | "%i",
+            .chapter span l@[:2] .comment-chapter | "%i",
+            div .comment-tools child@; {
+                .likes.u span title=Like; i | "%i",
+                .dlikes.u span title=Dislike; i | "%i",
+            }
+        }
+    } |
+'
+
+ucurl() {
+    curl -k -L -g -m 120 -s -b "$_cookies" -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) QtWebEngine/5.15.2 Chrome/87.0.4280.144 Safari/537.36" -H "Accept-Encoding: gzip, deflate" -H "Referer: $DOMAIN/" --compressed "$@"
+}
+
+get_chapter() {
+    local -r name="$(basename "$1")"
+
+    [ -e "$name" ] && {
+        echo "directory $name already exists"
+        return
+    }
+
+    echo "$name" >&2
+    mkdir "$name"
+    cd "$name" || return
+
+    g=1
+    echo "$1" >&2
+    local -r t="$(ucurl "$1")"
+    local -r images="$(reliq '.images.a [0] script m@" var chapImages = " | "%i\n"  sed "/var chapImages/{ s/^[^\x27]*\x27//; s/\x27.*//; s/,/\n/g; p;q }" "n"' <<< "$t")"
+
+    if [ "$mode" -ne 0 ]
+    then
+        local -r _chapter_id="$(reliq 'script m@" var chapterId = " | "%i\n" / sed "/var chapterId/{s/.* //;s/;//; p; q}" "n"' <<< "$t")"
+        local -r _book_id="$(reliq 'script m@" var bookId = " | "%i\n" / sed "/var bookId/{s/.* //;s/;//; p; q}" "n"' <<< "$t")"
+
+        {
+        echo "{\"url\":\"$1\",\"id\":$_chapter_id}"
+        echo "$images"
+        [ "$mode" -eq 2 ] && get_comments_info "https://comments.$DTOP/comments/$_book_id/$_chapter_id?page=" "&sort=newest"
+        } | jq -srcM 'add' > "info.json"
+    fi
+    [ "$noimages" -eq 0 ] && for i in $(jq -rcM '.images[]' <<< "$images")
+    do
+        fname="$(printf "%02d" "$g").jpg"
+        echo "$fname" >&2
+
+        if [ "$threads" -gt 1 ]
+        then
+            [ "$(jobs | wc -l)" -gt "$threads" ] && wait %%
+            ucurl "$i" > "$fname" &
+        else
+            ucurl "$i" > "$fname"
+        fi
+        ((g++))
+    done
+    wait
+
+    cd ..
+}
+
+get_general_info() {
+    reliq '
+        .breadcrumbs * #breadcrumbs-container; a; {
+            .name * self@ | "%(title)v",
+            .url * self@ | "'"$DOMAIN"'%(href)v"
+        } | ,
+        div .book-info; {
+            .cover * #cover; [0] img data-src | "%(data-src)v",
+            div .detail; {
+                div .name child@; {
+                    .title h1 | "%Di",
+                    .titles.a(";") h2 | "%Di" / sed "s/; /;/g"
+                },
+                div .meta child@; {
+                    .authors strong m@b>Authors; a ssub@; {
+                        .url * self@ | "%(href)v",
+                        .title * self@ | "%(title)v"
+                    } | ,
+                    .status strong m@b>Status; [0] a ssub@; span | "%i",
+                    .genres strong m@b>Genres; a ssub@; {
+                        .url * self@ | "%(href)v",
+                        .title * self@ | "%i" line [1] tr "\n" sed "s/^Read //;s/ Manga$//"
+                    } | ,
+                    .chapters.u strong m@b>Chapters; [0] span ssub@ | "%i",
+                    .lastupdate strong m@b>"Last update"; [0] span ssub@ | "%i",
+                }
+            }
+        },
+        .summary div data-target=summary; p .content m@B>"[a-zA-Z0-9]" | "%i",
+
+    ' <<< "$_comic_t"
+}
+
+get_rating_info() {
+    echo "$DOMAIN/api/manga/$_comic_id/rating" >&2
+    ucurl "$DOMAIN/api/manga/$_comic_id/rating" -H "Referer: $DOMAIN/" | reliq '
+        .rating.n span .rating | "%i",
+        .votes.u div c@[0] m@e>"votes" | "%i",
+        .rating-numbers * .art-item; {
+            .rating.u [0] span | "%i",
+            .value.n progress | "%(value)v"
+        } |
+    '
+}
+
+get_reviews_info() {
+    local page=1 pages=0 tpages re
+    while :
+    do
+        [ "$page" -gt "$reviews_limit" ] && break
+        echo "$DOMAIN/api/reviews/$_comic_id?page=$page&sort=newest" >&2
+        re="$(ucurl "$DOMAIN/api/reviews/$_comic_id?page=$page&sort=newest" -H "Referer: $DOMAIN/")"
+
+
+        tpages="$(reliq 'div .paginator; [-] a id | "%(id)v"' <<< "$re")"
+        if [ "$pages" -eq 0 ]
+        then
+            pages="$tpages"
+            [ -z "$pages" ] && pages=1
+            [ "$pages" -gt 1 ] && echo "review pages: $pages" >&2
+        fi
+
+        reliq '
+            .reviews div #b>rv-; {
+                .avatar div .author child@; img data-src | "%(data-src)v",
+                div .comment-info child@; div .comment-summary child@; {
+                    .name span .author-name child@ | "%i",
+                    .date abbr .comment-date value child@ | "%(value)v",
+                    .subtext span .comment-chapter child@ | "%i",
+                    .rating.u div .rating-view child@; i .fa | "\n" / wc "l",
+                    .text div .summary child@ | "%i",
+                    div .comment-tools child@; {
+                        .likes.u span title=Like; i | "%i",
+                        .dlikes.u span title=Dislike; i | "%i",
+                    },
+                    .comments div .comment-replies; '"$RELIQ_COMMENTS"'
+                }
+            } |
+            ' <<< "$re"
+
+        [ "$pages" -le "$page" ] && break
+        [ -z "$tpages" ] && break
+        sleep "$waittime"
+        ((page++))
+    done | jq -srcM '. | {"reviews":[.[].reviews[]] }'
+}
+
+get_comments_info() {
+    #if $2 = &sort=replies then it will get all comments even from chapters of the comic
+    #e.g. for https://mangabuddy.com/solo-leveling it will get 4300 comment pages instead of normal 1580
+    local page=1 pages=0 tpages re url
+    while :
+    do
+        [ "$page" -gt "$comments_limit" ] && break
+        url="$1$page$2"
+        echo "$url" >&2
+        re="$(ucurl "$url" -H "Referer: $DOMAIN/")"
+
+        tpages="$(reliq 'div .paginator; [-] a id | "%(id)v"' <<< "$re")"
+        if [ "$pages" -eq 0 ]
+        then
+            pages="$tpages"
+            [ -z "$pages" ] && pages=1
+            [ "$pages" -gt 1 ] && echo "comment pages: $pages" >&2
+        fi
+
+        reliq '.comments '"$RELIQ_COMMENTS"'' <<< "$re"
+
+        [ "$pages" -le "$page" ] && break
+        [ -z "$tpages" ] && break
+        sleep "$waittime"
+        ((page++))
+    done | jq -srcM '. | {"comments":[.[].comments[]] }'
+}
+
+get_comic_info() {
+    get_general_info
+
+    if [ "$mode" -eq 2 ]
+    then
+        get_rating_info
+
+        get_reviews_info
+
+        get_comments_info "https://comments.$DTOP/comments/$_comic_id?page=" "&sort=newest"
+    fi
+}
+
+get_comic() {
+    echo "$1" >&2
+    _comic_t="$(ucurl "$1")"
+
+    local -r name="$(reliq 'div .detail; div .name; h1 | "%i\n"' <<< "$_comic_t")"
+
+    [ "$mode" -ne 0 -a -e "$name" ] && {
+        echo "directory $name already exists"
+        return
+    }
+
+    echo "$name"
+    mkdir "$name"
+    cd "$name" || return
+
+    _comic_id="$(reliq 'script m@" var bookId = " | "%i\n" / sed "/var bookId/{s/.* //;s/;//; p; q}" "n"' <<< "$_comic_t")"
+    local chaptersource
+    local -r chapterscount="$(reliq 'div .title; span m@b>"CHAPTERS" | "%i\n" / sed "s/.*(//;s/).*//"' <<< "$_comic_t")"
+    if [ "$chapterscount" -le 100 ]
+    then
+        chaptersource="$_comic_t";
+    else
+        echo "$DOMAIN/api/manga/$_comic_id/chapters?source=detail" >&2
+        chaptersource="$(ucurl "$DOMAIN/api/manga/$_comic_id/chapters?source=detail")"
+    fi
+
+    local -r chapters="$(reliq '.chapters * #chapter-list; li child@; { .url a href | "'"$DOMAIN"'%(href)v", .title strong .chapter-title | "%i", .date time | "%i"} |' <<< "$chaptersource")"
+
+    if [ "$mode" -ne 0 ]
+    then
+        {
+            echo '{"url":"'"$1"'","id":'"$_comic_id"'}'
+            echo "$chapters"
+            get_comic_info <<< "$_comic_t"
+        } | jq -srcM 'add' > info.json
+    fi
+
+    [ "$nochapters" -eq 0 ] && for i in $(jq -rcM '.chapters[].url' <<< "$chapters" | sort -u)
+    do
+        get_chapter "$i"
+    done
+
+    cd ..
+}
+
+get_list() {
+    local page=1 pages=0 re next="$1"
+    while :
+    do
+        echo "$next" >&2
+        re="$(ucurl "$next")"
+        for i in $(reliq 'div .manga-list; div .title; h3; a | "'"$DOMAIN"'%(href)v\n"' <<< "$re")
+        do
+            get_comic "$i"
+        done
+
+        next="$(reliq 'div .paginator; a .active child@; [0] a ssub@ | "'"$DOMAIN"'%(href)v\n"' <<< "$re")"
+        [ -z "$next" ] && break
+    done
+}
+
+usage() {
+    printf '%s [OPTION...] [URL...]\n' "$arg0"
+    printf "Download images and metadata from mangabuddy\n\n"
+    printf "It will automatically create directories named by content.\n"
+    printf "Metadata will be saved to info.json.\n\n"
+    printf "When downloading any image or content from urls in metadata remember to do so with \"Referer: $DOMAIN/\" header set, errors otherwise returned are very deceptive.\n\n"
+    printf "Options:\n"
+    printf "  -t,   --threads NUM\tset number of threads used to download images\n"
+    printf "  -d,   --directory DIR\tset directory\n"
+    printf "  --full\t\tdownload everything (can take long time)\n"
+    printf "  --basic\t\tget basic metadata from single page (set by default)\n"
+    printf "  --images-only\t\tdownload only images\n"
+    printf "  --noimages\t\tdownload only metadata\n"
+    printf "  --nochapters\t\tdo not download chapters\n"
+    printf "  --comments-limit NUM\tset max number of comment pages traversed (matters only when --full set)\n"
+    printf "  --reviews-limit NUM\tset max number of review pages traversed (matters only when --full set)\n"
+    printf "  --comic URL\t\tforce to treat url as comic\n"
+    printf "  --chapter URL\t\tforce to treat url as chapter\n"
+    printf "  --list URL\t\tforce to treat url as list\n"
+    printf "  -w,   --wait SECONDS\twait before requests for reviews and comments (by default set to 0.6)\n"
+    printf "  -h\t\t\tshow help\n"
+}
+
+[ "$#" -eq '0' ] && { usage >&2; exit 1; }
+
+while [ "$#" -gt 0 ]
+do
+    case "$1" in
+        -d|--dir) cd "$2" || break; shift;;
+        -b|--cookie) _cookies="$2"; shift;;
+        -t|--threads) threads="$2"; shift;;
+        --full) mode=2;;
+        --basic) mode=1;;
+        --images-only) mode=1;;
+        --noimages) noimages=1;;
+        --nochapters) nochapters=1;;
+        --comments-limit) comments_limit="$2"; shift;;
+        --reviews-limit) reviews_limit="$2"; shift;;
+        --comic) get_comic "$2"; shift;;
+        --chapter) get_chapter "$2"; shift;;
+        --list) get_list "$2"; shift;;
+        -w|--wait) waittime="$2"; shift;;
+        -h|--help) usage >&2; exit;;
+        -*) printf '%s: invalid argument -- %s\n' "$arg0" "$1" >&2; exit 1;;
+
+        http?(s)://$DTOP/latest)
+            get_list "$1";;
+        http?(s)://$DTOP/popular)
+            get_list "$1";;
+        http?(s)://$DTOP/top/+([^/]))
+            get_list "$1";;
+        http?(s)://$DTOP/genres/+([^/]))
+            get_list "$1";;
+        http?(s)://$DTOP/status/+([^/]))
+            get_list "$1";;
+        http?(s)://$DTOP/authors/+([^/]))
+            get_list "$1";;
+        http?(s)://$DTOP/manga-list/+([[:digit:]]))
+            get_list "$1";;
+        http?(s)://$DTOP/+([^/])/+([^/]))
+            get_chapter "$1";;
+        http?(s)://$DTOP/+([^/]))
+            get_comic "$1";;
+        *)
+            echo "$1 - bad url" >&2
+    esac
+    shift
+done
