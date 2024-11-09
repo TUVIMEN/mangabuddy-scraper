@@ -223,11 +223,11 @@ get_comic() {
     local -r name="$(reliq 'div .detail; div .name; h1 | "%i\n"' <<< "$_comic_t")"
 
     [ "$mode" -ne 0 -a -e "$name" ] && {
-        echo "directory $name already exists"
+        echo "directory $name already exists" >&2
         return
     }
 
-    echo "$name"
+    echo "$name" >&2
     mkdir "$name"
     cd "$name" || return
 
