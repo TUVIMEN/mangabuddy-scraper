@@ -2,7 +2,7 @@
 
 A bash script for downloading images and metadata from mangabuddy.
 
-<video src="example.mkv" autoplay="true" />
+[example video](https://raw.githubusercontent.com/TUVIMEN/mangabuddy-scraper/refs/heads/master/example.webm)
 
 ## Requirements
 
