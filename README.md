@@ -15,7 +15,7 @@ A bash script for downloading images and metadata from mangabuddy.
 
 ## Output examples
 
-Can be found in [examples](https://github.com/TUVIMEN/mangabuddy-scraper/examples) and were created by running
+Can be found in [examples](https://github.com/TUVIMEN/mangabuddy-scraper/tree/master/examples) and were created by running
 
     mangabuddy-scraper --noimages --full URL1 URL2 URL3
 
