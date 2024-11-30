@@ -6,8 +6,8 @@ IFS=$'\n'
 shopt -s extglob
 
 declare -r DTOP="mangabuddy.com"
-declare -r DOMAIN="https://$DTOP" waittime=0.6
-declare _cookies threads=4 comments_limit=9999999 reviews_limit=9999999 noimages=0 nochapters=0
+declare -r DOMAIN="https://$DTOP"
+declare _cookies threads=4 comments_limit=9999999 reviews_limit=9999999 noimages=0 nochapters=0 waittime=0.6
 declare -r arg0="$(basename "$0")"
 
 declare mode=1
