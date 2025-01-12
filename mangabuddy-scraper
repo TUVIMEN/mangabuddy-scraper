@@ -109,7 +109,7 @@ get_general_info() {
                     .status strong m@b>Status; [0] a ssub@; span | "%i",
                     .genres strong m@b>Genres; a ssub@; {
                         .url * self@ | "%(href)v",
-                        .title * self@ | "%i" line [1] tr "\n" sed "s/^Read //;s/ Manga$//"
+                        .title * self@ | "%i" line [0] tr "\n" sed "s/^Read //;s/ Manga$//"
                     } | ,
                     .chapters.u strong m@b>Chapters; [0] span ssub@ | "%i",
                     .lastupdate strong m@b>"Last update"; [0] span ssub@ | "%i",
