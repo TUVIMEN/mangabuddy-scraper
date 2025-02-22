@@ -323,23 +323,23 @@ do
         -h|--help) usage >&2; exit;;
         -*) printf '%s: invalid argument -- %s\n' "$arg0" "$1" >&2; exit 1;;
 
-        http?(s)://$DTOP/latest)
+        http?(s)://$DTOP/latest?(/))
             get_list "$1";;
-        http?(s)://$DTOP/popular)
+        http?(s)://$DTOP/popular?(/))
             get_list "$1";;
-        http?(s)://$DTOP/top/+([^/]))
+        http?(s)://$DTOP/top/+([^/])?(/))
             get_list "$1";;
-        http?(s)://$DTOP/genres/+([^/]))
+        http?(s)://$DTOP/genres/+([^/])?(/))
             get_list "$1";;
-        http?(s)://$DTOP/status/+([^/]))
+        http?(s)://$DTOP/status/+([^/])?(/))
             get_list "$1";;
-        http?(s)://$DTOP/authors/+([^/]))
+        http?(s)://$DTOP/authors/+([^/])?(/))
             get_list "$1";;
-        http?(s)://$DTOP/manga-list/+([[:digit:]]))
+        http?(s)://$DTOP/manga-list/+([[:digit:]])?(/))
             get_list "$1";;
-        http?(s)://$DTOP/+([^/])/+([^/]))
+        http?(s)://$DTOP/+([^/])/+([^/])?(/))
             get_chapter "$1";;
-        http?(s)://$DTOP/+([^/]))
+        http?(s)://$DTOP/+([^/])?(/))
             get_comic "$1";;
         *)
             echo "$1 - bad url" >&2
