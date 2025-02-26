@@ -56,12 +56,12 @@ get_chapter() {
     g=1
     echo "$1" >&2
     local -r t="$(ucurl "$1")"
-    local -r images="$(reliq '.images.a [0] script m@" var chapImages = " | "%i\n"  sed "/var chapImages/{ s/^[^\x27]*\x27//; s/\x27.*//; s/,/\n/g; p;q }" "n"' <<< "$t")"
+    local -r images="$(reliq '.images.a [0] script i@" var chapImages = " | "%i\n"  sed "/var chapImages/{ s/^[^\x27]*\x27//; s/\x27.*//; s/,/\n/g; p;q }" "n"' <<< "$t")"
 
     if [ "$mode" -ne 0 ]
     then
-        local -r _chapter_id="$(reliq 'script m@" var chapterId = " | "%i\n" / sed "/var chapterId/{s/.* //;s/;//; p; q}" "n"' <<< "$t")"
-        local -r _book_id="$(reliq 'script m@" var bookId = " | "%i\n" / sed "/var bookId/{s/.* //;s/;//; p; q}" "n"' <<< "$t")"
+        local -r _chapter_id="$(reliq 'script i@" var chapterId = " | "%i\n" / sed "/var chapterId/{s/.* //;s/;//; p; q}" "n"' <<< "$t")"
+        local -r _book_id="$(reliq 'script i@" var bookId = " | "%i\n" / sed "/var bookId/{s/.* //;s/;//; p; q}" "n"' <<< "$t")"
 
         {
         echo "{\"url\":\"$1\",\"id\":$_chapter_id}"
@@ -102,21 +102,21 @@ get_general_info() {
                     .titles.a(";") h2 | "%Di" / sed "s/; /;/g"
                 },
                 div .meta child@; {
-                    .authors strong m@b>Authors; a ssub@; {
+                    .authors strong i@b>Authors; a ssub@; {
                         .url * self@ | "%(href)v",
                         .title * self@ | "%(title)v"
                     } | ,
-                    .status strong m@b>Status; [0] a ssub@; span | "%i",
-                    .genres strong m@b>Genres; a ssub@; {
+                    .status strong i@b>Status; [0] a ssub@; span | "%i",
+                    .genres strong i@b>Genres; a ssub@; {
                         .url * self@ | "%(href)v",
                         .title * self@ | "%i" line [0] tr "\n" sed "s/^Read //;s/ Manga$//"
                     } | ,
-                    .chapters.u strong m@b>Chapters; [0] span ssub@ | "%i",
-                    .lastupdate strong m@b>"Last update"; [0] span ssub@ | "%i",
+                    .chapters.u strong i@b>Chapters; [0] span ssub@ | "%i",
+                    .lastupdate strong i@b>"Last update"; [0] span ssub@ | "%i",
                 }
             }
         },
-        .summary div data-target=summary; p .content m@B>"[a-zA-Z0-9]" | "%i",
+        .summary div data-target=summary; p .content i@B>"[a-zA-Z0-9]" | "%i",
 
     ' <<< "$_comic_t"
 }
@@ -125,7 +125,7 @@ get_rating_info() {
     echo "$DOMAIN/api/manga/$_comic_id/rating" >&2
     ucurl "$DOMAIN/api/manga/$_comic_id/rating" -H "Referer: $DOMAIN/" | reliq '
         .rating.n span .rating | "%i",
-        .votes.u div c@[0] m@e>"votes" | "%i",
+        .votes.u div c@[0] i@e>"votes" | "%i",
         .rating-numbers * .art-item; {
             .rating.u [0] span | "%i",
             .value.n progress | "%(value)v"
@@ -231,9 +231,9 @@ get_comic() {
     mkdir "$name"
     cd "$name" || return
 
-    _comic_id="$(reliq 'script m@" var bookId = " | "%i\n" / sed "/var bookId/{s/.* //;s/;//; p; q}" "n"' <<< "$_comic_t")"
+    _comic_id="$(reliq 'script i@" var bookId = " | "%i\n" / sed "/var bookId/{s/.* //;s/;//; p; q}" "n"' <<< "$_comic_t")"
     local chaptersource
-    local -r chapterscount="$(reliq 'div .title; span m@b>"CHAPTERS" | "%i\n" / sed "s/.*(//;s/).*//"' <<< "$_comic_t")"
+    local -r chapterscount="$(reliq 'div .title; span i@b>"CHAPTERS" | "%i\n" / sed "s/.*(//;s/).*//"' <<< "$_comic_t")"
     if [ "$chapterscount" -le 100 ]
     then
         chaptersource="$_comic_t";
