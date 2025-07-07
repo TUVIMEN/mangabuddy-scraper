@@ -42,10 +42,13 @@ ucurl_r() {
 }
 
 ucurl_file() {
+    local minsize="$3"
+    [ -z "$minsize" ] && minsize='1'
+
     while :
     do
         ucurl_r "$1" > "$2"
-        [ -s "$2" ] && break
+        [ -e "$2" -a "$(stat -c%s "$2")" -ge "$minsize" ] && break
         sleep "$retry_time"
     done
 }
@@ -96,9 +99,9 @@ get_chapter() {
         if [ "$threads" -gt 1 ]
         then
             [ "$(jobs | wc -l)" -gt "$threads" ] && wait %%
-            ucurl_file "$i" "$fname" &
+            ucurl_file "$i" "$fname" 100 &
         else
-            ucurl_file "$i" "$fname"
+            ucurl_file "$i" "$fname" 100
         fi
         ((g++))
     done
