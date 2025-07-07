@@ -7,7 +7,7 @@ shopt -s extglob
 
 declare -r DTOP="mangabuddy.com"
 declare -r DOMAIN="https://$DTOP"
-declare _cookies threads=4 comments_limit=9999999 reviews_limit=9999999 noimages=0 nochapters=0 waittime=0.6 retry_time=1
+declare _cookies threads=4 comments_limit=9999999 reviews_limit=9999999 noimages=0 nochapters=0 waittime=0.6 retry_time=1 proxy=''
 declare -r arg0="$(basename "$0")"
 
 declare mode=1
@@ -38,7 +38,7 @@ declare -r RELIQ_COMMENTS='
 '
 
 ucurl_r() {
-    curl -k -L -g -m 120 -s -b "$_cookies" -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) QtWebEngine/5.15.2 Chrome/87.0.4280.144 Safari/537.36" -H "Accept-Encoding: gzip, deflate" -H "Referer: $DOMAIN/" --compressed "$@"
+    curl -k -L -g -m 120 -s -b "$_cookies" -x "$proxy" -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) QtWebEngine/5.15.2 Chrome/87.0.4280.144 Safari/537.36" -H "Accept-Encoding: gzip, deflate" -H "Referer: $DOMAIN/" --compressed "$@"
 }
 
 ucurl_file() {
@@ -342,6 +342,7 @@ do
         --chapter) get_chapter "$2"; shift;;
         --list) get_list "$2"; shift;;
         -w|--wait) waittime="$2"; shift;;
+        -x|--proxy) proxy="$2"; shift;;
         -h|--help) usage >&2; exit;;
         -*) printf '%s: invalid argument -- %s\n' "$arg0" "$1" >&2; exit 1;;
 
