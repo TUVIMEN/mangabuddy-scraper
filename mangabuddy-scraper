@@ -7,7 +7,7 @@ shopt -s extglob
 
 declare -r DTOP="mangabuddy.com"
 declare -r DOMAIN="https://$DTOP"
-declare _cookies threads=4 comments_limit=9999999 reviews_limit=9999999 noimages=0 nochapters=0 waittime=0.6
+declare _cookies threads=4 comments_limit=9999999 reviews_limit=9999999 noimages=0 nochapters=0 waittime=0.6 retry_time=1
 declare -r arg0="$(basename "$0")"
 
 declare mode=1
@@ -37,8 +37,27 @@ declare -r RELIQ_COMMENTS='
     } |
 '
 
-ucurl() {
+ucurl_r() {
     curl -k -L -g -m 120 -s -b "$_cookies" -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) QtWebEngine/5.15.2 Chrome/87.0.4280.144 Safari/537.36" -H "Accept-Encoding: gzip, deflate" -H "Referer: $DOMAIN/" --compressed "$@"
+}
+
+ucurl_file() {
+    while :
+    do
+        ucurl_r "$1" > "$2"
+        [ -s "$2" ] && break
+        sleep "$retry_time"
+    done
+}
+
+ucurl() {
+    local t
+    while :
+    do
+        t="$(ucurl_r "$@")" && break
+        sleep "$retry_time"
+    done
+    echo "$t"
 }
 
 get_chapter() {
@@ -77,9 +96,9 @@ get_chapter() {
         if [ "$threads" -gt 1 ]
         then
             [ "$(jobs | wc -l)" -gt "$threads" ] && wait %%
-            ucurl "$i" > "$fname" &
+            ucurl_file "$i" "$fname" &
         else
-            ucurl "$i" > "$fname"
+            ucurl_file "$i" "$fname"
         fi
         ((g++))
     done
