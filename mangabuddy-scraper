@@ -18,7 +18,7 @@ declare mode=1
 
 declare -r RELIQ_COMMENTS='
     div .comment-item; {
-        .lvl.u * self | "%L",
+        .lvl.u @ | "%L",
         div .author child@; {
             .avatar img data-src | "%(data-src)v",
             .type span .author-type | "%i"
@@ -56,12 +56,12 @@ get_chapter() {
     g=1
     echo "$1" >&2
     local -r t="$(ucurl "$1")"
-    local -r images="$(reliq '.images.a [0] script i@" var chapImages = " | "%i\n"  sed "/var chapImages/{ s/^[^\x27]*\x27//; s/\x27.*//; s/,/\n/g; p;q }" "n"' <<< "$t")"
+    local -r images="$(reliq '.images.a [0] script i@"var chapImages = " | "%i\n"  sed "/var chapImages/{ s/^[^\x27]*\x27//; s/\x27.*//; s/,/\n/g; p;q }" "n"' <<< "$t")"
 
     if [ "$mode" -ne 0 ]
     then
-        local -r _chapter_id="$(reliq 'script i@" var chapterId = " | "%i\n" / sed "/var chapterId/{s/.* //;s/;//; p; q}" "n"' <<< "$t")"
-        local -r _book_id="$(reliq 'script i@" var bookId = " | "%i\n" / sed "/var bookId/{s/.* //;s/;//; p; q}" "n"' <<< "$t")"
+        local -r _chapter_id="$(reliq 'script i@"var chapterId = " | "%i\n" / sed "/var chapterId/{s/.* //;s/;//; p; q}" "n"' <<< "$t")"
+        local -r _book_id="$(reliq 'script i@"var bookId = " | "%i\n" / sed "/var bookId/{s/.* //;s/;//; p; q}" "n"' <<< "$t")"
 
         {
         echo "{\"url\":\"$1\",\"id\":$_chapter_id}"
