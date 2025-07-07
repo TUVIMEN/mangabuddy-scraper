@@ -231,7 +231,7 @@ get_comic() {
     mkdir "$name"
     cd "$name" || return
 
-    _comic_id="$(reliq 'script i@" var bookId = " | "%i\n" / sed "/var bookId/{s/.* //;s/;//; p; q}" "n"' <<< "$_comic_t")"
+    _comic_id="$(reliq 'script i@"var bookId = " | "%i\n" / sed "/var bookId/{s/.* //;s/;//; p; q}" "n"' <<< "$_comic_t")"
     local chaptersource
     local -r chapterscount="$(reliq 'div .title; span i@b>"CHAPTERS" | "%i\n" / sed "s/.*(//;s/).*//"' <<< "$_comic_t")"
     if [ "$chapterscount" -le 100 ]
@@ -242,7 +242,7 @@ get_comic() {
         chaptersource="$(ucurl "$DOMAIN/api/manga/$_comic_id/chapters?source=detail")"
     fi
 
-    local -r chapters="$(reliq '.chapters * #chapter-list; li child@; { .url a href | "'"$DOMAIN"'%(href)v", .title strong .chapter-title | "%i", .date time | "%i"} |' <<< "$chaptersource")"
+    local -r chapters="$(reliq '.chapters * #chapter-list; li child@; { .url a href | "'"$DOMAIN"'%(href)v", .title strong .chapter-title | "%i", .date time | "%i" } |' <<< "$chaptersource")"
 
     if [ "$mode" -ne 0 ]
     then
