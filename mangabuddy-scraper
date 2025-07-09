@@ -277,6 +277,7 @@ get_comic() {
 
     [ "$nochapters" -eq 0 ] && for i in $(jq -rcM '.chapters[].url' <<< "$chapters" | sort -V -u)
     do
+        sleep "$waittime"
         get_chapter "$i"
     done
 
