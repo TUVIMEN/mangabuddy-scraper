@@ -1,0 +1,68 @@
+#!/bin/bash
+# by Dominik Stanisław Suchora <hexderm@gmail.com>
+# License: GNU GPLv3
+
+# v1
+    #ucurl() {
+        #curl -k -L -g -m 120 -s -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) QtWebEngine/5.15.2 Chrome/87.0.4280.144 Safari/537.36" -H "Accept-Encoding: gzip, deflate" --compressed "$@"
+    #}
+
+    #for i in $(ucurl 'https://mangabuddy.com/sitemap.xml' | reliq 'loc m@"/sitemap/chapters_" | "%i\n"')
+    #do
+        #ucurl "$i" | gunzip | reliq 'loc | "%i\n"'
+    #done | sed 's/\/[^/]*$//' | sort -u > list
+
+# v2
+    #mangabuddy-scraper -w 2 --noimages --full --list 'https://mangabuddy.com/az-list'
+
+# v3
+
+ucurl_r() {
+    curl -k -L -g -m 120 -s -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) QtWebEngine/5.15.2 Chrome/87.0.4280.144 Safari/537.36" -H "Accept-Encoding: gzip, deflate" --compressed "$@"
+}
+
+ucurl() {
+    local t
+    while :
+    do
+        t="$(ucurl_r "$@")"
+        [ -n "$t" ] && break
+    done
+    echo "$t"
+}
+
+if [ "$#" -lt 1 ]
+then
+    echo "$(basename "$0")" "<PROXIES-FILE>" "<THREADS>" >&2
+    exit 1
+fi
+
+page=1
+pages=0
+next="https://mangabuddy.com/az-list"
+mapfile -t proxies < "$1"
+proxiesl="${#proxies[@]}"
+c_proxy=0
+threads="$2"
+[ -z "$threads" ] && threads="$proxiesl"
+
+DOMAIN="https://mangabuddy.com"
+
+while :
+do
+    echo "$next" >&2
+    re="$(ucurl "$next")"
+    for i in $(reliq 'div .manga-list; div .title; h3; a | "'"$DOMAIN"'%(href)v\n"' <<< "$re")
+    do
+        [ "$(jobs | wc -l)" -gt "$threads" ] && wait %%
+        mangabuddy-scraper -w 2 -x "${proxies[c_proxy]}" --noimages --full --comic "$i" &
+        sleep 2
+        ((c_proxy++))
+        [ "$c_proxy" -ge "$proxiesl" ] && c_proxy=0
+    done
+
+    next="$(reliq 'div .paginator; a .active child@; [0] a ssub@ | "'"$DOMAIN"'%(href)v\n"' <<< "$re")"
+    [ -z "$next" ] && break
+done
+
+wait

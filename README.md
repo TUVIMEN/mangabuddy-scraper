@@ -58,3 +58,13 @@ Force urls to be used as a chapter, comic, list
 Get some help
 
     wordpress-madara-scraper -h
+
+## Scraping whole site
+
+At the root of this project is script named `mangabuddy-all`. It's a wrapper script tailored to getting metadata from entire site in fast, extendable and reliable way.
+
+Running this tool requires `mangabuddy-scraper` to be already installed. It takes 2 arguments, file with proxies in format accepted by curl in each line and number of threads. If you don't plan on using proxies you can set proxy file to `/dev/null`, although downloading everything might take months. If number of threads is not specified it defaults to number of proxies.
+
+Images links expire, so if you plan to mirror entire site you'll have to remove `--noimages` option of `mangabuddy-scraper` in `mangabuddy-all` script.
+
+You can see scraped results of entire site [here](https://huggingface.co/datasets/hexderm/mangabuddy).
